@@ -1,4 +1,4 @@
-# Final MobProg - Profile App
+# Resume_Ranking
 
 ## Overview
 This is a Flutter mobile application developed as a final project for Mobile Programming. It showcases a user profile system with real-time data integration using Supabase. The app features a clean "Matcha" inspired UI theme and comprehensive profile management capabilities.
