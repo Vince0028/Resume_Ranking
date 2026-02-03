@@ -107,6 +107,35 @@ class _ChatScreenState extends State<ChatScreen> {
     return DateFormat('h:mm a').format(dt);
   }
 
+  Future<void> _confirmClearChat() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Clear Conversation'),
+        content: const Text('Are you sure you want to delete all messages?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Clear', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      await SupabaseService.deleteConversation(widget.otherUserId);
+      if (mounted) {
+        setState(() {
+          _messages.clear();
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final currentUserId = SupabaseService.currentUser?.id;
@@ -128,9 +157,26 @@ class _ChatScreenState extends State<ChatScreen> {
                   : null,
             ),
             const SizedBox(width: 10),
-            Text(widget.otherUserName),
+            Expanded(
+              child: Text(
+                widget.otherUserName,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
           ],
         ),
+        actions: [
+          PopupMenuButton<String>(
+            onSelected: (value) {
+              if (value == 'clear') {
+                _confirmClearChat();
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(value: 'clear', child: Text('Clear Chat')),
+            ],
+          ),
+        ],
       ),
       body: Column(
         children: [

@@ -621,6 +621,19 @@ class SupabaseService {
     return List<Map<String, dynamic>>.from(response);
   }
 
+  // Delete conversation
+  static Future<void> deleteConversation(String otherUserId) async {
+    final userId = currentUser?.id;
+    if (userId == null) return;
+
+    await client
+        .from('messages')
+        .delete()
+        .or(
+          'and(sender_id.eq.$userId,receiver_id.eq.$otherUserId),and(sender_id.eq.$otherUserId,receiver_id.eq.$userId)',
+        );
+  }
+
   // Send a message
   static Future<void> sendMessage(String receiverId, String content) async {
     final userId = currentUser?.id;
@@ -630,7 +643,7 @@ class SupabaseService {
       'sender_id': userId,
       'receiver_id': receiverId,
       'content': content,
-      'created_at': DateTime.now().toUtc().toIso8601String(), // UTC
+      // 'created_at': let Supabase default to now()
     });
   }
 
