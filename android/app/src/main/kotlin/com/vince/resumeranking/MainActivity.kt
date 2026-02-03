@@ -1,4 +1,4 @@
-package com.example.final_mobprog
+package com.vince.resumeranking
 
 import io.flutter.embedding.android.FlutterActivity
 
