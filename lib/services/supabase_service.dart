@@ -630,7 +630,7 @@ class SupabaseService {
       'sender_id': userId,
       'receiver_id': receiverId,
       'content': content,
-      'created_at': DateTime.now().toIso8601String(),
+      'created_at': DateTime.now().toUtc().toIso8601String(), // UTC
     });
   }
 
@@ -647,24 +647,23 @@ class SupabaseService {
     _messagesChannel?.unsubscribe();
 
     _messagesChannel = client
-        .channel('messages:$userId:$otherUserId')
+        .channel('chat:$userId:$otherUserId')
         .onPostgresChanges(
           event: PostgresChangeEvent.insert,
           schema: 'public',
           table: 'messages',
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: 'receiver_id',
-            value: userId,
-          ), // Listen for incoming messages
           callback: (payload) {
-            // Check if it's from the user we are chatting with
-            if (payload.newRecord['sender_id'] == otherUserId) {
-              onMessage(payload.newRecord);
+            final newRecord = payload.newRecord;
+            // Check if it's from the user we are chatting with, sent to us
+            if (newRecord['sender_id'] == otherUserId &&
+                newRecord['receiver_id'] == userId) {
+              onMessage(newRecord);
             }
           },
         )
-        .subscribe();
+        .subscribe((status, [error]) {
+          debugPrint('🔔 Chat Subscription Status: $status ${error ?? ""}');
+        });
   }
 
   // Unsubscribe from messages
@@ -684,7 +683,7 @@ class SupabaseService {
         .select()
         .or('sender_id.eq.$userId,receiver_id.eq.$userId')
         .order('created_at', ascending: false)
-        .limit(100);
+        .limit(500); // Increased limit to catch more conversations
 
     final List<dynamic> messages = response;
     final Map<String, Map<String, dynamic>> chats = {};
