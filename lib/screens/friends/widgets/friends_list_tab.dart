@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../profile/profile_screen.dart';
+import '../../chat/chat_screen.dart';
 import 'empty_state_widget.dart';
 
 class FriendsListTab extends StatelessWidget {
@@ -43,6 +45,22 @@ class FriendsListTab extends StatelessWidget {
                 return Card(
                   margin: const EdgeInsets.only(bottom: 12),
                   child: ListTile(
+                    onTap: () {
+                      if (friend != null) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const ProfileScreen(),
+                            settings: RouteSettings(
+                              arguments: {
+                                'userId': friend['id'],
+                                'isOwner': false,
+                              },
+                            ),
+                          ),
+                        );
+                      }
+                    },
                     leading: CircleAvatar(
                       backgroundColor: Theme.of(context).primaryColor,
                       child: Text(
@@ -52,29 +70,51 @@ class FriendsListTab extends StatelessWidget {
                     ),
                     title: Text(friend?['name'] ?? 'Unknown'),
                     subtitle: Text(friend?['email'] ?? ''),
-                    trailing: PopupMenuButton<String>(
-                      onSelected: (value) {
-                        if (value == 'remove') {
-                          onRemoveFriend(
-                            friendshipId,
-                            friend?['name'] ?? 'this user',
-                          );
-                        }
-                      },
-                      itemBuilder: (context) => [
-                        const PopupMenuItem(
-                          value: 'remove',
-                          child: ListTile(
-                            leading: Icon(
-                              Icons.person_remove,
-                              color: Colors.red,
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.chat_bubble_outline),
+                          onPressed: () {
+                            if (friend != null) {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => ChatScreen(
+                                    otherUserId: friend['id'],
+                                    otherUserName: friend['name'] ?? 'Unknown',
+                                    otherUserAvatar: friend['avatar_url'],
+                                  ),
+                                ),
+                              );
+                            }
+                          },
+                        ),
+                        PopupMenuButton<String>(
+                          onSelected: (value) {
+                            if (value == 'remove') {
+                              onRemoveFriend(
+                                friendshipId,
+                                friend?['name'] ?? 'this user',
+                              );
+                            }
+                          },
+                          itemBuilder: (context) => [
+                            const PopupMenuItem(
+                              value: 'remove',
+                              child: ListTile(
+                                leading: Icon(
+                                  Icons.person_remove,
+                                  color: Colors.red,
+                                ),
+                                title: Text(
+                                  'Remove Friend',
+                                  style: TextStyle(color: Colors.red),
+                                ),
+                                contentPadding: EdgeInsets.zero,
+                              ),
                             ),
-                            title: Text(
-                              'Remove Friend',
-                              style: TextStyle(color: Colors.red),
-                            ),
-                            contentPadding: EdgeInsets.zero,
-                          ),
+                          ],
                         ),
                       ],
                     ),

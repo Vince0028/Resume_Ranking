@@ -323,12 +323,16 @@ class SupabaseService {
   static Future<Map<String, dynamic>?> getCurrentUserProfile() async {
     final user = currentUser;
     if (user == null) return null;
+    return getUserProfile(user.id);
+  }
 
+  // Get any user's profile by ID
+  static Future<Map<String, dynamic>?> getUserProfile(String userId) async {
     try {
       final response = await client
           .from('profiles')
           .select()
-          .eq('id', user.id)
+          .eq('id', userId)
           .maybeSingle();
       return response;
     } catch (e) {
@@ -595,5 +599,140 @@ class SupabaseService {
         .eq('requester_id', userId)
         .eq('status', 'pending');
     return List<Map<String, dynamic>>.from(response);
+  }
+
+  // === Messaging Operations ===
+
+  // Get messages between current user and another user
+  static Future<List<Map<String, dynamic>>> getMessages(
+    String otherUserId,
+  ) async {
+    final userId = currentUser?.id;
+    if (userId == null) return [];
+
+    final response = await client
+        .from('messages')
+        .select()
+        .or(
+          'and(sender_id.eq.$userId,receiver_id.eq.$otherUserId),and(sender_id.eq.$otherUserId,receiver_id.eq.$userId)',
+        )
+        .order('created_at', ascending: true); // Oldest first for chat UI
+
+    return List<Map<String, dynamic>>.from(response);
+  }
+
+  // Send a message
+  static Future<void> sendMessage(String receiverId, String content) async {
+    final userId = currentUser?.id;
+    if (userId == null) return;
+
+    await client.from('messages').insert({
+      'sender_id': userId,
+      'receiver_id': receiverId,
+      'content': content,
+      'created_at': DateTime.now().toIso8601String(),
+    });
+  }
+
+  static RealtimeChannel? _messagesChannel;
+
+  // Subscribe to messages for a specific chat
+  static void subscribeToMessages(
+    String otherUserId,
+    Function(Map<String, dynamic>) onMessage,
+  ) {
+    final userId = currentUser?.id;
+    if (userId == null) return;
+
+    _messagesChannel?.unsubscribe();
+
+    _messagesChannel = client
+        .channel('messages:$userId:$otherUserId')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'messages',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'receiver_id',
+            value: userId,
+          ), // Listen for incoming messages
+          callback: (payload) {
+            // Check if it's from the user we are chatting with
+            if (payload.newRecord['sender_id'] == otherUserId) {
+              onMessage(payload.newRecord);
+            }
+          },
+        )
+        .subscribe();
+  }
+
+  // Unsubscribe from messages
+  static void unsubscribeFromMessages() {
+    _messagesChannel?.unsubscribe();
+    _messagesChannel = null;
+  }
+
+  // Get list of recent chat partners with last message
+  static Future<List<Map<String, dynamic>>> getRecentChats() async {
+    final userId = currentUser?.id;
+    if (userId == null) return [];
+
+    // Fetch all messages involving the user
+    final response = await client
+        .from('messages')
+        .select()
+        .or('sender_id.eq.$userId,receiver_id.eq.$userId')
+        .order('created_at', ascending: false)
+        .limit(100);
+
+    final List<dynamic> messages = response;
+    final Map<String, Map<String, dynamic>> chats = {};
+
+    for (final msg in messages) {
+      final senderId = msg['sender_id'] as String;
+      final receiverId = msg['receiver_id'] as String;
+      final content = msg['content'] as String;
+      final createdAt = msg['created_at'] as String;
+
+      final otherId = senderId == userId ? receiverId : senderId;
+
+      if (!chats.containsKey(otherId)) {
+        chats[otherId] = {
+          'partner_id': otherId,
+          'last_message': content,
+          'timestamp': createdAt,
+        };
+      }
+    }
+
+    // Now fetch profiles for these partners
+    if (chats.isEmpty) return [];
+
+    final partnerIds = chats.keys.toList();
+    final profilesResponse = await client
+        .from('profiles')
+        .select('id, name, avatar_url')
+        .inFilter('id', partnerIds);
+
+    final List<Map<String, dynamic>> results = [];
+    for (final profile in profilesResponse) {
+      final id = profile['id'] as String;
+      if (chats.containsKey(id)) {
+        results.add({
+          ...chats[id]!, // message info
+          ...profile, // profile info
+        });
+      }
+    }
+
+    // Sort by timestamp
+    results.sort(
+      (a, b) => DateTime.parse(
+        b['timestamp'],
+      ).compareTo(DateTime.parse(a['timestamp'])),
+    );
+
+    return results;
   }
 }

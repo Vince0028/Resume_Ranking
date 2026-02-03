@@ -8,6 +8,7 @@ import '../../services/supabase_service.dart';
 import 'widgets/profile_info_section.dart';
 import 'widgets/profile_hobbies_section.dart';
 import 'widgets/profile_project_list.dart';
+import '../chat/chat_screen.dart';
 import 'widgets/profile_sliver_app_bar.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -20,72 +21,108 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   UserProfile? _fetchedProfile;
   bool _isLoading = true;
-  String? _avatarUrl;
-  String? _backgroundUrl;
 
   @override
-  void initState() {
-    super.initState();
-    _loadOwnProfile();
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _checkArguments();
   }
 
-  Future<void> _loadOwnProfile() async {
+  Future<void> _checkArguments() async {
+    final args =
+        ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+    final String? userId = args?['userId'] as String?;
+    final bool isOwner = args?['isOwner'] as bool? ?? true;
+
+    // Only load if we haven't loaded yet or if we are switching users
+    if (!isOwner && userId != null && _fetchedProfile?.id != userId) {
+      _loadProfile(userId);
+    } else if (isOwner && _fetchedProfile == null) {
+      _loadProfile(null);
+    }
+  }
+
+  Future<void> _loadProfile(String? targetUserId) async {
     final currentUser = SupabaseService.currentUser;
-    if (currentUser == null) {
-      setState(() => _isLoading = false);
+    final userId = targetUserId ?? currentUser?.id;
+
+    if (userId == null) {
+      if (mounted) setState(() => _isLoading = false);
       return;
     }
 
     try {
-      // Fetch the user's resume from Supabase
-      final resumeData = await SupabaseService.getUserResume(currentUser.id);
+      if (mounted) setState(() => _isLoading = true);
 
-      if (resumeData != null && mounted) {
+      // Try to fetch resume first
+      final resumeData = await SupabaseService.getUserResume(userId);
+
+      if (resumeData != null) {
         final data = resumeData['resume_data'] as Map<String, dynamic>? ?? {};
-        setState(() {
-          // Load avatar URL from resume data
-          _avatarUrl = data['avatar_url']?.toString();
-          _backgroundUrl = data['background_url']?.toString();
+        final fetchedProfile = UserProfile(
+          id: userId,
+          name: data['name']?.toString() ?? 'User',
+          bio: resumeData['content']?.toString() ?? '',
+          email: data['email']?.toString() ?? '',
+          phone: data['phone']?.toString() ?? '',
+          hobbies:
+              (data['hobbies'] as List<dynamic>?)
+                  ?.map((e) => e.toString())
+                  .toList() ??
+              [],
+          projects:
+              (data['projects'] as List<dynamic>?)
+                  ?.map((e) => Project.fromJson(e))
+                  .toList() ??
+              [],
+          imagePath: data['avatar_url']?.toString() ?? '',
+          backgroundImagePath: data['background_url']?.toString() ?? '',
+        );
 
-          _fetchedProfile = UserProfile(
-            id: currentUser.id,
-            name:
-                data['name']?.toString() ??
-                currentUser.email?.split('@').first ??
-                'User',
-            bio: resumeData['content']?.toString() ?? '',
-            email: data['email']?.toString() ?? currentUser.email ?? '',
-            phone: data['phone']?.toString() ?? '',
+        if (mounted) {
+          setState(() {
+            _fetchedProfile = fetchedProfile;
+            _isLoading = false;
+          });
+        }
+      } else {
+        // Fallback to basic profile if no resume
+        final profileData = await SupabaseService.getUserProfile(userId);
+        if (profileData != null) {
+          final fetchedProfile = UserProfile(
+            id: userId,
+            name: profileData['name'] ?? 'User',
+            bio: profileData['bio'] ?? '',
+            email: profileData['email'] ?? '',
+            phone: profileData['phone'] ?? '',
+            imagePath: profileData['avatar_url'] ?? '',
             hobbies:
-                (data['hobbies'] as List<dynamic>?)
+                (profileData['hobbies'] as List<dynamic>?)
                     ?.map((e) => e.toString())
                     .toList() ??
                 [],
-            projects:
-                (data['projects'] as List<dynamic>?)
-                    ?.map((e) => Project.fromJson(e))
-                    .toList() ??
-                [],
-            imagePath: _avatarUrl ?? '',
-            backgroundImagePath: _backgroundUrl ?? '',
           );
-          _isLoading = false;
-        });
-      } else {
-        setState(() => _isLoading = false);
+          if (mounted) {
+            setState(() {
+              _fetchedProfile = fetchedProfile;
+              _isLoading = false;
+            });
+          }
+        } else {
+          if (mounted) setState(() => _isLoading = false);
+        }
       }
     } catch (e) {
       debugPrint('Error loading profile: $e');
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   ImageProvider? _getAvatarImage(String imagePath) {
-    // Check if it's a URL (from Supabase storage)
     if (imagePath.isNotEmpty && imagePath.startsWith('http')) {
       return NetworkImage(imagePath);
     }
-    // Default avatar (null to trigger Initials/Icon in AppBar)
     return null;
   }
 
@@ -105,6 +142,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               Navigator.pop(ctx);
               await SupabaseService.signOut();
               if (mounted) {
+                Navigator.popUntil(context, (route) => route.isFirst);
                 Navigator.pushReplacementNamed(context, '/signin');
               }
             },
@@ -117,27 +155,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Check if viewing someone else's resume
     final args =
         ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
     final Resume? resume = args?['resume'] as Resume?;
     final bool isOwner = args?['isOwner'] as bool? ?? true;
 
-    // Show loading indicator while fetching own profile
-    if (_isLoading && resume == null) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Profile')),
-        body: const Center(child: CircularProgressIndicator()),
-      );
-    }
-
-    // Build profile from resume data or current user's profile
+    // Build profile from resume data, fetched profile, or current user
     UserProfile displayProfile;
     if (resume != null) {
-      // Create a profile from resume data (viewing someone else's)
       final resumeData = resume.resumeData;
-      final otherAvatarUrl = resumeData['avatar_url']?.toString() ?? '';
-      final otherBackgroundUrl = resumeData['background_url']?.toString() ?? '';
       displayProfile = UserProfile(
         id: resume.userId,
         name: resume.userName,
@@ -154,15 +180,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ?.map((e) => Project.fromJson(e))
                 .toList() ??
             [],
-        imagePath: otherAvatarUrl,
-        backgroundImagePath: otherBackgroundUrl,
+        imagePath: resumeData['avatar_url']?.toString() ?? '',
+        backgroundImagePath: resumeData['background_url']?.toString() ?? '',
       );
     } else if (_fetchedProfile != null) {
-      // Use profile fetched from Supabase
       displayProfile = _fetchedProfile!;
     } else {
-      // Fallback to AppProvider
       displayProfile = context.watch<AppProvider>().userProfile;
+    }
+
+    if (_isLoading && _fetchedProfile == null && !isOwner) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Profile')),
+        body: const Center(child: CircularProgressIndicator()),
+      );
     }
 
     return Scaffold(
@@ -185,12 +216,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 title: 'Projects',
                 projects: displayProfile.projects,
               ),
-              const SizedBox(height: 80), // Space for FAB
+              const SizedBox(height: 80),
             ]),
           ),
         ],
       ),
-      // Only show Edit Profile FAB if viewing your own profile
       floatingActionButton: isOwner
           ? FloatingActionButton.extended(
               onPressed: () {
@@ -199,7 +229,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
               icon: const Icon(Icons.edit),
               label: const Text('Edit Profile'),
             )
-          : null,
+          : FloatingActionButton.extended(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => ChatScreen(
+                      otherUserId: displayProfile.id,
+                      otherUserName: displayProfile.name,
+                      otherUserAvatar: displayProfile.imagePath,
+                    ),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.chat),
+              label: const Text('Chat'),
+              backgroundColor: Theme.of(context).primaryColor,
+              foregroundColor: Colors.white,
+            ),
     );
   }
 

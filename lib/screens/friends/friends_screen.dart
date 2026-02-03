@@ -8,6 +8,7 @@ import 'widgets/all_users_tab.dart';
 import 'widgets/requests_tab.dart';
 import 'widgets/friends_list_tab.dart';
 import 'widgets/sent_requests_sheet.dart';
+import '../chat/chat_list_screen.dart';
 
 class FriendsScreen extends StatefulWidget {
   const FriendsScreen({super.key});
@@ -376,6 +377,18 @@ class _FriendsScreenState extends State<FriendsScreen>
                 ),
               ],
             ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          showModalBottomSheet(
+            context: context,
+            isScrollControlled: true,
+            backgroundColor: Colors.transparent,
+            builder: (context) => const ChatListModal(),
+          );
+        },
+        backgroundColor: Theme.of(context).primaryColor,
+        child: const Icon(Icons.forum, color: Colors.white),
+      ),
     );
   }
 
