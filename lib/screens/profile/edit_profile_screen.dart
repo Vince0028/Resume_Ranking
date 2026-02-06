@@ -7,6 +7,7 @@ import '../../providers/app_provider.dart';
 import '../../models/models.dart';
 import '../../services/supabase_service.dart';
 import 'widgets/project_editor_dialog.dart';
+import 'widgets/location_picker.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -28,6 +29,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   List<Project> _projects = [];
   String _imagePath = '';
   String _backgroundImagePath = '';
+  double? _latitude;
+  double? _longitude;
   bool _obscureCurrentPassword = true;
   bool _obscureNewPassword = true;
   bool _obscureConfirmPassword = true;
@@ -69,6 +72,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             final hobbies = profile['hobbies'] as List<dynamic>?;
             _hobbiesController.text = hobbies?.join(', ') ?? '';
             _imagePath = profile['avatar_url'] ?? '';
+            _latitude = (profile['latitude'] as num?)?.toDouble();
+            _longitude = (profile['longitude'] as num?)?.toDouble();
           } else {
             // New user - set email from auth
             _emailController.text = currentUser.email ?? '';
@@ -239,6 +244,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     phone: _phoneController.text,
                     avatarUrl: avatarUrl.isNotEmpty ? avatarUrl : null,
                     hobbies: hobbiesList,
+                    latitude: _latitude,
+                    longitude: _longitude,
                   );
 
                   // Also create/update the resume entry for the leaderboard
@@ -535,6 +542,26 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         hintText: 'Coding, Reading, Gaming',
                       ),
                     ),
+                    const SizedBox(height: 30),
+
+                    Text(
+                      'Location',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    LocationPicker(
+                      initialLatitude: _latitude,
+                      initialLongitude: _longitude,
+                      onLocationPicked: (lat, long) {
+                        setState(() {
+                          _latitude = lat;
+                          _longitude = long;
+                        });
+                      },
+                    ),
+
                     const SizedBox(height: 30),
 
                     _buildProjectSection(

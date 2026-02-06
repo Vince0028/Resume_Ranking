@@ -8,6 +8,8 @@ class UserProfile {
   String backgroundImagePath; // Path for profile banner
   List<String> hobbies;
   List<Project> projects;
+  double? latitude;
+  double? longitude;
 
   UserProfile({
     this.id = '',
@@ -27,6 +29,8 @@ class UserProfile {
       'Full Stack',
     ],
     this.projects = const [],
+    this.latitude,
+    this.longitude,
   });
 
   // Factory constructor for empty profile (new users)
@@ -41,6 +45,8 @@ class UserProfile {
       backgroundImagePath: '',
       hobbies: [],
       projects: [],
+      latitude: null,
+      longitude: null,
     );
   }
 
@@ -53,6 +59,8 @@ class UserProfile {
       'email': email,
       'phone': phone,
       'hobbies': hobbies,
+      'latitude': latitude,
+      'longitude': longitude,
       'projects': projects.map((p) => p.toJson()).toList(),
     };
   }
@@ -66,6 +74,8 @@ class UserProfile {
       email: json['email'] ?? '',
       phone: json['phone'] ?? '',
       hobbies: List<String>.from(json['hobbies'] ?? []),
+      latitude: (json['latitude'] as num?)?.toDouble(),
+      longitude: (json['longitude'] as num?)?.toDouble(),
       projects:
           (json['projects'] as List?)
               ?.map((p) => Project.fromJson(p))

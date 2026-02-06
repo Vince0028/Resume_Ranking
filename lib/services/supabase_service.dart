@@ -570,6 +570,8 @@ class SupabaseService {
     String? phone,
     String? avatarUrl,
     List<String>? hobbies,
+    double? latitude,
+    double? longitude,
   }) async {
     final user = currentUser;
     if (user == null) throw Exception('No user logged in');
@@ -582,6 +584,8 @@ class SupabaseService {
       'phone': phone,
       'avatar_url': avatarUrl,
       'hobbies': hobbies,
+      'latitude': latitude,
+      'longitude': longitude,
       'updated_at': DateTime.now().toIso8601String(),
     });
   }
