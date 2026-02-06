@@ -189,7 +189,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       displayProfile = context.watch<AppProvider>().userProfile;
     }
 
-    if (_isLoading && _fetchedProfile == null && !isOwner) {
+    if (_isLoading && _fetchedProfile == null && !isOwner && resume == null) {
       return Scaffold(
         appBar: AppBar(title: const Text('Profile')),
         body: const Center(child: CircularProgressIndicator()),

@@ -1,5 +1,7 @@
 import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -133,11 +135,21 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     if (pickedFile != null) {
       debugPrint('📷 Picked image path: ${pickedFile.path}');
-      final bytes = await pickedFile.readAsBytes();
-      setState(() {
-        _imagePath = pickedFile.path;
-        _imageBytes = bytes;
-      });
+
+      // Compress image
+      final Uint8List? bytes = await FlutterImageCompress.compressWithFile(
+        pickedFile.path,
+        minWidth: 512,
+        minHeight: 512,
+        quality: 70,
+      );
+
+      if (bytes != null) {
+        setState(() {
+          _imagePath = pickedFile.path;
+          _imageBytes = bytes;
+        });
+      }
     }
   }
 
@@ -147,11 +159,21 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     if (pickedFile != null) {
       debugPrint('🖼️ Picked background path: ${pickedFile.path}');
-      final bytes = await pickedFile.readAsBytes();
-      setState(() {
-        _backgroundImagePath = pickedFile.path;
-        _backgroundBytes = bytes;
-      });
+
+      // Compress image
+      final Uint8List? bytes = await FlutterImageCompress.compressWithFile(
+        pickedFile.path,
+        minWidth: 1920,
+        minHeight: 1080,
+        quality: 70,
+      );
+
+      if (bytes != null) {
+        setState(() {
+          _backgroundImagePath = pickedFile.path;
+          _backgroundBytes = bytes;
+        });
+      }
     }
   }
 
